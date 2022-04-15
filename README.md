@@ -1,409 +1,171 @@
-# projectbatch12
-#importing the libraries
-import pandas as pd
-import webbrowser
-import dash
-import dash_html_components as html
-from dash.dependencies import Input, Output 
-import dash_core_components as dcc 
-import plotly.graph_objects as go  
-import plotly.express as px
-from dash.exceptions import PreventUpdate
+import random
+import math
+import matplotlib.pyplot as plt
+import csv
 
-app = dash.Dash()
-project_name = None
-# Defining Functions
-def load_data():
-    dataset_name = "global_terror.csv"
+dataset = open('encounter.csv')
+reader = csv.reader(dataset)
 
-    global df
-    df = pd.read_csv(dataset_name)
+with open("./encounter.csv", "r") as csvfile:
+    reader_variable = csv.reader(csvfile, delimiter=",")
+    for row in reader_variable:
+        print(row)
 
-    global month_list
-    month = {
-           "January":1,
-           "February": 2,
-           "March": 3,
-           "April":4,
-           "May":5,
-           "June":6,
-           "July": 7,
-           "August":8,
-           "September":9,
-           "October":10,
-           "November":11,
-           "December":12
-           }
-    month_list= [{"label":key, "value":values} for key,values in month.items()]
+X = dataset.iloc[:, [13,14]]
+m=X.shape[0] #number of training examples
+n=X.shape[1] #number of features. Here n=2
+n_iter=100
 
-    global date_list
-    date_list = [x for x in range(1, 32)]
+K=5
+Centroids=np.array([]).reshape(n,0)
 
-    global region_list
-    region_list = [{"label": str(i), "value": str(i)}  for i in sorted( df['region_txt'].unique().tolist() ) ]
+for i in range(K):
+rand=rd.randint(0,m-1)
+Centroids=np.c_[Centroids,X[rand]]
 
-    global country_list
-    country_list = df.groupby("region_txt")["country_txt"].unique().apply(list).to_dict()
+Output={}
 
-    global state_list
-    state_list = df.groupby("country_txt")["provstate"].unique().apply(list).to_dict()
+EuclidianDistance=np.array([]).reshape(m,0)
+for k in range(K):
+       tempDist=np.sum((X-Centroids[:,k])**2,axis=1)
+        EuclidianDistance=np.c_[EuclidianDistance,tempDist]
+C=np.argmin(EuclidianDistance,axis=1)+1
 
-    global city_list
-    city_list  = df.groupby("provstate")["city"].unique().apply(list).to_dict()
+Y={}
+for k in range(K):
+    Y[k+1]=np.array([]).reshape(2,0)
+for i in range(m):
+    Y[C[i]]=np.c_[Y[C[i]],X[i]]
+     
+for k in range(K):
+    Y[k+1]=Y[k+1].T
+    
+for k in range(K):
+     Centroids[:,k]=np.mean(Y[k+1],axis=0)
 
-    global attack_type_list
-    attack_type_list = [{"label": str(i), "value": str(i)}  for i in df['attacktype1_txt'].unique().tolist()]
+for i in range(n_iter):
+     #step 2.a
+      EuclidianDistance=np.array([]).reshape(m,0)
+      for k in range(K):
+          tempDist=np.sum((X-Centroids[:,k])**2,axis=1)
+          EuclidianDistance=np.c_[EuclidianDistance,tempDist]
+      C=np.argmin(EuclidianDistance,axis=1)+1
+     #step 2.b
+      Y={}
+      for k in range(K):
+          Y[k+1]=np.array([]).reshape(2,0)
+      for i in range(m):
+          Y[C[i]]=np.c_[Y[C[i]],X[i]]
+     
+      for k in range(K):
+          Y[k+1]=Y[k+1].T
+    
+      for k in range(K):
+          Centroids[:,k]=np.mean(Y[k+1],axis=0)
+      Output=Y
 
-    global year_list
-    year_list = sorted ( df['iyear'].unique().tolist()  )
+plt.scatter(X[:,0],X[:,1],c='black',label='unclustered data')
+plt.xlabel('Income')
+plt.ylabel('Number of transactions')
+plt.legend()
+plt.title('Plot of data points')
+plt.show()
 
-    global year_dict
-    year_dict = {str(year): str(year) for year in year_list}
+color=['red','blue','green','cyan','magenta']
+labels=['cluster1','cluster2','cluster3','cluster4','cluster5']
+for k in range(K):
+    plt.scatter(Output[k+1][:,0],Output[k+1][:,1],c=color[k],label=labels[k])
+plt.scatter(Centroids[0,:],Centroids[1,:],s=300,c='yellow',label='Centroids')
+plt.xlabel('Income')
+plt.ylabel('Number of transactions')
+plt.legend()
+plt.show()
 
-    #chart dropdown options
-    global chart_dropdown_values
-    chart_dropdown_values = {"Terrorist Organisation":'gname', 
-                               "Target Nationality":'natlty1_txt', 
-                               "Target Type":'targtype1_txt', 
-                               "Type of Attack":'attacktype1_txt', 
-                               "Weapon Type":'weaptype1_txt', 
-                               "Region":'region_txt', 
-                               "Country Attacked":'country_txt'
-                            }
+WCSS_array=np.array([])
+for K in range(1,11):
+    kmeans=Kmeans(X,K)
+    kmeans.fit(n_iter)
+    Output,Centroids=kmeans.predict()
+    wcss=0
+    for k in range(K):
+        wcss+=np.sum((Output[k+1]-Centroids[k,:])**2)
+    WCSS_array=np.append(WCSS_array,wcss)
 
-    chart_dropdown_values = [{"label":keys, "value":value} for keys, value in chart_dropdown_values.items()]
+K_array=np.arange(1,11,1)
+plt.plot(K_array,WCSS_array)
+plt.xlabel('Number of Clusters')
+plt.ylabel('within-cluster sums of squares (WCSS)')
+plt.title('Elbow method to determine optimum number of clusters')
+plt.show()
 
+i=rd.randint(0,X.shape[0])
+Centroid=np.array([X[i]])
 
-def open_browser():
-    # Opens the default web browser
-    webbrowser.open_new('http://127.0.0.1:8050/')
+D=np.array([]) 
+for x in X:
+    D=np.append(D,np.min(np.sum((x-Centroid)**2)))
 
+prob=D/np.sum(D)
 
-# Layout of the page
-def create_app_ui():
-    # Creating the UI of the Webpage
-    main_layout = html.Div(style={'backgroundColor': 'black'}, children=[
-    html.H1('Terrorism Analysis with Insights', id='Main_title', style={'text-align':'center','color':'white'}),
-    dcc.Tabs(id="Tabs", value="Map",children=[
-        dcc.Tab(label="Map tool" ,id="Map tool",value="Map", children=[
-            dcc.Tabs(id = "subtabs", value = "WorldMap",children = [
-                dcc.Tab(label="World Map tool", id="World", value="WorldMap"),
-                dcc.Tab(label="India Map tool", id="India", value="IndiaMap")
-                ]),
-            dcc.Dropdown(
-                id='month-dropdown', 
-                  options=month_list,
-                  placeholder='Select Month',
-                  multi = True
-                    ),
-            dcc.Dropdown(
-                  id='date-dropdown', 
-                  placeholder='Select Day',
-                  multi = True
-                    ),
-            dcc.Dropdown(
-                  id='region-dropdown', 
-                  options=region_list,
-                  placeholder='Select Region',
-                  multi = True
-                    ),
-            dcc.Dropdown(
-                  id='country-dropdown', 
-                  options=[{'label': 'All', 'value': 'All'}],
-                  placeholder='Select Country',
-                  multi = True
-                    ),
-            dcc.Dropdown(
-                  id='state-dropdown', 
-                  options=[{'label': 'All', 'value': 'All'}],
-                  placeholder='Select State or Province',
-                  multi = True
-                    ),
-            dcc.Dropdown(
-                  id='city-dropdown', 
-                  options=[{'label': 'All', 'value': 'All'}],
-                  placeholder='Select City',
-                  multi = True
-                    ),
-            dcc.Dropdown(
-                  id='attacktype-dropdown', 
-                  options=attack_type_list,#[{'label': 'All', 'value': 'All'}],
-                  placeholder='Select Attack Type',
-                  multi = True
-                    ),
+cummulative_prob=np.cumsum(prob)
 
-            html.H5('Select the Year', id='year_title'),
-            dcc.RangeSlider(
-                      id='year-slider',
-                      min=min(year_list),
-                      max=max(year_list),
-                      value=[min(year_list),max(year_list)],
-                      marks=year_dict,
-                      step=None
-                        ),
-            html.Br()
-      ]),
-        dcc.Tab(label = "Chart Tool", id="chart tool", value="Chart", children=[
-            dcc.Tabs(id = "subtabs2", value = "WorldChart",children = [
-                dcc.Tab(label="World Chart tool", id="WorldC", value="WorldChart", children = [          
-                    html.Br(),
-                    html.Br(),
-                    dcc.Dropdown(id="Chart_Dropdown", options = chart_dropdown_values, placeholder="Select option", value = "region_txt"), 
-                    html.Br(),
-                    html.Br(),
-                    html.Hr(),
-                    dcc.Input(id="search", placeholder="Search Filter"),
-                    html.Hr(),
-                    html.Br(),
-                    dcc.RangeSlider(
-                      id='cyear_slider',
-                      min=min(year_list),
-                      max=max(year_list),
-                      value=[min(year_list),max(year_list)],
-                      marks=year_dict,
-                      step=None
-                        ),
-                    html.Br()
-                    ]),
-                dcc.Tab(label="India Chart tool", id="IndiaC", value="IndiaChart", children = [])
-                ]),
-           ])
-       ]),
-    dcc.Loading(dcc.Graph(id='graph-object', figure = go.Figure()))
-    ])
+r=rd.random()
+i=0
+for j,p in enumerate(cummulative_prob):
+    if r<p:
+       i=j
+       break
+Centroid=np.append(Centroid,[X[i]],axis=0)
 
-    return main_layout
+i=rd.randint(0,X.shape[0])
+Centroid=np.array([X[i]])
+K=5
+for k in range(1,K):
+    D=np.array([]) 
+    for x in X:
+        D=np.append(D,np.min(np.sum((x-Centroid)**2)))
+    prob=D/np.sum(D)
+    cummulative_prob=np.cumsum(prob)
+    r=rd.random()
+    i=0
+    for j,p in enumerate(cummulative_prob):
+        if r<p:
+            i=j
+            break
+    Centroid=np.append(Centroid,[X[i]],axis=0)
+
+for i in range(K):
+    rand=rd.randint(0,m-1)
+    Centroids_rand=np.c_[Centroids_rand,X[rand]]
+plt.scatter(X[:,0],X[:,1])
+plt.scatter(Centroid_temp[:,0],Centroid_temp[:,1],s=200,color='yellow')
+plt.scatter(Centroids_rand[0,:],Centroids_rand[1,:],s=300,color='black')
+
+from sklearn.cluster import KMeans
+wcss = []
+for i in range(1, 11):
+    kmeans = KMeans(n_clusters = i, init = 'k-means++', random_state = 42)
+    kmeans.fit(X)
+    wcss.append(kmeans.inertia_)
+plt.plot(range(1, 11), wcss)
+plt.title('The Elbow Method')
+plt.xlabel('Number of clusters')
+plt.ylabel('WCSS')
+plt.show()
 
 
-# Callback of the page
-@app.callback(
-    Output('graph-object', 'figure'),
-    [
-    Input("Tabs", "value"),
-    Input('month-dropdown', 'value'),
-    Input('date-dropdown', 'value'),
-    Input('region-dropdown', 'value'),
-    Input('country-dropdown', 'value'),
-    Input('state-dropdown', 'value'),
-    Input('city-dropdown', 'value'),
-    Input('attacktype-dropdown', 'value'),
-    Input('year-slider', 'value'), 
-    Input('cyear_slider', 'value'),
-    Input("Chart_Dropdown", "value"),
-    Input("search", "value"),
-    Input("subtabs2", "value")
-    ]
-    )
+kmeans = KMeans(n_clusters = 5, init = 'k-means++', random_state = 42)
+y_kmeans = kmeans.fit_predict(X)
 
-def update_app_ui(Tabs, month_value, date_value,region_value,country_value,state_value,city_value,attack_value,year_value, chart_year_selector, chart_dp_value, search, subtabs2):
-    fig = None
+plt.scatter(X[y_kmeans == 0, 0], X[y_kmeans == 0, 1], s = 100, c = 'red', label = 'Cluster 1')
+plt.scatter(X[y_kmeans == 1, 0], X[y_kmeans == 1, 1], s = 100, c = 'blue', label = 'Cluster 2')
+plt.scatter(X[y_kmeans == 2, 0], X[y_kmeans == 2, 1], s = 100, c = 'green', label = 'Cluster 3')
+plt.scatter(X[y_kmeans == 3, 0], X[y_kmeans == 3, 1], s = 100, c = 'cyan', label = 'Cluster 4')
+plt.scatter(X[y_kmeans == 4, 0], X[y_kmeans == 4, 1], s = 100, c = 'magenta', label = 'Cluster 5')
+plt.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1], s = 300, c = 'yellow', label = 'Centroids')
+plt.title('Clusters of customers')
+plt.xlabel('Annual Income (k$)')
+plt.ylabel('Spending Score (1-100)')
+plt.legend()
+plt.show()
 
-    if Tabs == "Map":
-        print("Data Type of month value = " , str(type(month_value)))
-        print("Data of month value = " , month_value)
-
-        print("Data Type of Day value = " , str(type(date_value)))
-        print("Data of Day value = " , date_value)
-
-        print("Data Type of region value = " , str(type(region_value)))
-        print("Data of region value = " , region_value)
-
-        print("Data Type of country value = " , str(type(country_value)))
-        print("Data of country value = " , country_value)
-
-        print("Data Type of state value = " , str(type(state_value)))
-        print("Data of state value = " , state_value)
-
-        print("Data Type of city value = " , str(type(city_value)))
-        print("Data of city value = " , city_value)
-
-        print("Data Type of Attack value = " , str(type(attack_value)))
-        print("Data of Attack value = " , attack_value)
-
-        print("Data Type of year value = " , str(type(year_value)))
-        print("Data of year value = " , year_value)
-        # year_filter
-        year_range = range(year_value[0], year_value[1]+1)
-        new_df = df[df["iyear"].isin(year_range)]
-
-        # month_filter
-        if month_value==[] or month_value is None:
-            pass
-        else:
-            if date_value==[] or date_value is None:
-                new_df = new_df[new_df["imonth"].isin(month_value)]
-            else:
-                new_df = new_df[new_df["imonth"].isin(month_value)
-                                & (new_df["iday"].isin(date_value))]
-        # region, country, state, city filter
-        if region_value==[] or region_value is None:
-            pass
-        else:
-            if country_value==[] or country_value is None :
-                new_df = new_df[new_df["region_txt"].isin(region_value)]
-            else:
-                if state_value == [] or state_value is None:
-                    new_df = new_df[(new_df["region_txt"].isin(region_value))&
-                                    (new_df["country_txt"].isin(country_value))]
-                else:
-                    if city_value == [] or city_value is None:
-                        new_df = new_df[(new_df["region_txt"].isin(region_value))&
-                        (new_df["country_txt"].isin(country_value)) &
-                        (new_df["provstate"].isin(state_value))]
-                    else:
-                        new_df = new_df[(new_df["region_txt"].isin(region_value))&
-                        (new_df["country_txt"].isin(country_value)) &
-                        (new_df["provstate"].isin(state_value))&
-                        (new_df["city"].isin(city_value))]
-
-        if attack_value == [] or attack_value is None:
-            pass
-        else:
-            new_df = new_df[new_df["attacktype1_txt"].isin(attack_value)] 
-
-        mapFigure = go.Figure()
-        if new_df.shape[0]:
-            pass
-        else: 
-            new_df = pd.DataFrame(columns = ['iyear', 'imonth', 'iday', 'country_txt', 'region_txt', 'provstate',
-               'city', 'latitude', 'longitude', 'attacktype1_txt', 'nkill'])
-
-            new_df.loc[0] = [0, 0 ,0, None, None, None, None, None, None, None, None]
-
-
-        mapFigure = px.scatter_mapbox(new_df,
-          lat="latitude", 
-          lon="longitude",
-          color="attacktype1_txt",
-          hover_name="city", 
-          hover_data=["region_txt", "country_txt", "provstate","city", "attacktype1_txt","nkill","iyear","imonth", "iday"],
-          zoom=1
-          )                       
-        mapFigure.update_layout(mapbox_style="open-street-map",
-          autosize=True,
-          margin=dict(l=0, r=0, t=25, b=20),
-          )
-
-        fig = mapFigure
-
-    elif Tabs=="Chart":
-        fig = None
-        chart_df = None
-        if subtabs2 == "WorldChart":
-
-            year_range_c = range(chart_year_selector[0], chart_year_selector[1]+1)
-
-            chart_df = df[df["iyear"].isin(year_range_c)]
-
-            if chart_dp_value is not None:
-                if search is not None: 
-                    chart_df = chart_df.groupby("iyear")[chart_dp_value].value_counts().reset_index(name = "count")
-                    chart_df  = chart_df[chart_df[chart_dp_value].str.contains(search, case = False)]
-                else:
-                    chart_df = chart_df.groupby("iyear")[chart_dp_value].value_counts().reset_index(name="count")
-            else:
-                raise PreventUpdate
-
-            if chart_df.shape[0]:
-                pass
-            else: 
-                chart_df = pd.DataFrame(columns = ['iyear', 'count', chart_dp_value])
-
-                chart_df.loc[0] = [0, 0,"No data"]
-
-
-            fig = px.area(chart_df, x= "iyear", y ="count", color = chart_dp_value)
-        else:
-           return None
-    return fig
-
-@app.callback(
-    Output("date-dropdown", "options"),
-    [Input("month-dropdown", "value")])
-def update_date(month):
-    option = []
-    if month:
-        option= [{"label":m, "value":m} for m in date_list]
-    return option
-
-@app.callback(
-    [Output("region-dropdown", "value"),
-    Output("region-dropdown", "disabled"),
-    Output("country-dropdown", "value"),
-    Output("country-dropdown", "disabled")],
-    Input("subtabs", "value")
-    )
-def update_r(tab):
-    region = None
-    disabled_r = False
-    country = None
-    disabled_c = False
-    if tab == "WorldMap":
-        pass
-    elif tab=="IndiaMap":
-        region = ["South Asia"]
-        disabled_r = True
-        country = ["India"]
-        disabled_c = True
-    return region, disabled_r, country, disabled_c
-
-@app.callback(
-    Output('country-dropdown', 'options'),
-    [Input('region-dropdown', 'value')])
-def set_country_options(region_value):
-    option = []
-    # Making the country Dropdown data
-    if region_value is  None:
-        raise PreventUpdate
-    else:
-        for var in region_value:
-            if var in country_list.keys():
-                option.extend(country_list[var])
-    return [{'label':m , 'value':m} for m in option]
-
-@app.callback(
-    Output('state-dropdown', 'options'),
-    [Input('country-dropdown', 'value')])
-def set_state_options(country_value):
-    # Making the state Dropdown data
-    option = []
-    if country_value is None :
-        raise PreventUpdate
-    else:
-        for var in country_value:
-            if var in state_list.keys():
-                option.extend(state_list[var])
-    return [{'label':m , 'value':m} for m in option]
-
-@app.callback(
-    Output('city-dropdown', 'options'),
-    [Input('state-dropdown', 'value')])
-def set_city_options(state_value):
-    # Making the city Dropdown data
-    option = []
-    if state_value is None:
-        raise PreventUpdate
-    else:
-        for var in state_value:
-            if var in city_list.keys():
-                option.extend(city_list[var])
-    return [{'label':m , 'value':m} for m in option]
-
-# Main Function to control the Flow of the Project
-def main():
-    load_data()
-
-    open_browser()
-    global project_name
-    project_name = "Terrorism Analysis with Insights" 
-    global app
-    app.layout = create_app_ui()
-    app.title = project_name
-    app.run_server() # debug=True
-    print("This would be executed only after the script is closed")
-    app = None
-    project_name = None
-
-
-if __name__ == '__main__':
-    main()
